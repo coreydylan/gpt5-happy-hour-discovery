@@ -13,6 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 import json
+import boto3
+from boto3.dynamodb.conditions import Attr
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -151,62 +153,72 @@ async def get_job_status(job_id: str):
     job = jobs[job_id]
     return JobStatus(**job)
 
-# Load restaurant database from JSON file
-restaurants_db = []
+# Initialize DynamoDB
 try:
-    with open('restaurants.json', 'r') as f:
-        restaurants_db = json.load(f)
-    logger.info(f"Loaded {len(restaurants_db)} restaurants from restaurants.json")
-except FileNotFoundError:
-    logger.warning("restaurants.json not found, using fallback data")
-    # Fallback to some sample data
-    restaurants_db = [
-        {
-            "id": "1",
-            "name": "DUKES RESTAURANT",
-            "address": "1216 PROSPECT ST",
-            "city": "LA JOLLA",
-            "state": "CA",
-            "zip": "92037",
-            "phone": "858-454-5888",
-            "business_type": "Restaurant Food Facility",
-            "active": True
-        },
-        {
-            "id": "2", 
-            "name": "BARBARELLA RESTAURANT",
-            "address": "2171 AVENIDA DE LA PLAYA",
-            "city": "LA JOLLA", 
-            "state": "CA",
-            "zip": "92037",
-            "phone": "858-242-2589",
-            "business_type": "Restaurant Food Facility",
-            "active": True
-        }
-    ]
+    dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+    restaurants_table = dynamodb.Table('restaurants')
+    logger.info("Connected to DynamoDB restaurants table")
+except Exception as e:
+    logger.error(f"Failed to connect to DynamoDB: {e}")
+    restaurants_table = None
 
 @app.get("/api/restaurants/search")
 async def search_restaurants(query: str = "", limit: int = 20):
-    """Search restaurants from full database"""
+    """Search restaurants from DynamoDB"""
     
-    # Filter restaurants based on query
-    if query:
-        query_lower = query.lower()
-        filtered_restaurants = [
-            r for r in restaurants_db 
-            if (query_lower in r.get("name", "").lower() or 
-                query_lower in r.get("address", "").lower() or
-                query_lower in r.get("city", "").lower()) and
-                r.get("active", True)  # Only active restaurants
+    if not restaurants_table:
+        # Fallback data if DynamoDB not available
+        fallback_restaurants = [
+            {
+                "id": "1",
+                "name": "DUKES RESTAURANT",
+                "address": "1216 PROSPECT ST",
+                "city": "LA JOLLA",
+                "state": "CA",
+                "zip": "92037",
+                "phone": "858-454-5888",
+                "business_type": "Restaurant Food Facility"
+            }
         ]
-    else:
-        # Return active restaurants only
-        filtered_restaurants = [r for r in restaurants_db if r.get("active", True)]
+        return {"restaurants": fallback_restaurants}
     
-    # Apply limit
-    limited_restaurants = filtered_restaurants[:limit]
-    
-    return {"restaurants": limited_restaurants}
+    try:
+        if query:
+            # Search using scan with filter (for simplicity - in production, use better indexing)
+            query_lower = query.lower()
+            response = restaurants_table.scan(
+                FilterExpression=(
+                    Attr('name').contains(query_lower) |
+                    Attr('address').contains(query_lower) |
+                    Attr('city').contains(query_lower)
+                ) & Attr('active').eq(True),
+                Limit=limit
+            )
+        else:
+            # Get all active restaurants
+            response = restaurants_table.scan(
+                FilterExpression=Attr('active').eq(True),
+                Limit=limit
+            )
+        
+        restaurants = response.get('Items', [])
+        
+        # Convert Decimal to float for JSON serialization
+        def convert_decimals(obj):
+            if hasattr(obj, 'to_eng_string'):
+                return float(obj)
+            elif isinstance(obj, dict):
+                return {k: convert_decimals(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_decimals(v) for v in obj]
+            return obj
+        
+        restaurants = convert_decimals(restaurants)
+        return {"restaurants": restaurants}
+        
+    except Exception as e:
+        logger.error(f"Error searching restaurants: {e}")
+        return {"restaurants": [], "error": str(e)}
 
 @app.get("/api/jobs")
 async def list_jobs():
