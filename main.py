@@ -118,8 +118,8 @@ async def analyze_restaurant_with_gpt5(restaurant_name: str, address: str, phone
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            max_completion_tokens=4000,
-            temperature=0.3  # Lower temperature for more consistent structured output
+            max_completion_tokens=4000
+            # GPT-5 only supports default temperature
         )
         
         # Get the response content
