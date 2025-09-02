@@ -107,17 +107,16 @@ async def analyze_restaurant_with_gpt5(restaurant_name: str, address: str, phone
         Set confidence_score based on source quality (0-1).
         """
         
-        # Call GPT-5 with web search tool enabled
+        # Call GPT-5 - it has web search built-in when asked
         response = await client.chat.completions.create(
             model="gpt-5",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a restaurant information specialist with web search capabilities. Search the web and provide only real, verified information about restaurant happy hours."
+                    "content": "You are a restaurant information specialist. Use your web search capabilities to find real, current information about restaurant happy hours. Search the web and provide only verified information."
                 },
                 {"role": "user", "content": prompt}
             ],
-            tools=[{"type": "web_search_preview"}],  # Enable web search
             response_format={"type": "json_object"},
             max_completion_tokens=4000,
             temperature=0.3  # Lower temperature for more consistent structured output
