@@ -26,8 +26,8 @@ interface HappyHourAnalysis {
   timestamp: string;
 }
 
-// API Functions - Use App Runner service URL
-const API_BASE_URL = 'https://pjqhqbtwn4.us-east-1.awsapprunner.com';
+// API Functions - Use ECS orchestrator service
+const API_BASE_URL = 'http://52.207.150.153:8000';
 
 const searchRestaurants = async (query: string): Promise<Restaurant[]> => {
   try {
