@@ -26,8 +26,8 @@ interface HappyHourAnalysis {
   timestamp: string;
 }
 
-// API Functions - Use ECS orchestrator service
-const API_BASE_URL = 'http://52.207.150.153:8000';
+// API Functions - Use Application Load Balancer
+const API_BASE_URL = 'http://happy-hour-alb-711828885.us-east-1.elb.amazonaws.com';
 
 const searchRestaurants = async (query: string): Promise<Restaurant[]> => {
   try {
