@@ -15,6 +15,7 @@ import httpx
 import json
 import boto3
 from boto3.dynamodb.conditions import Attr
+from openai import AsyncOpenAI
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -56,63 +57,123 @@ class JobStatus(BaseModel):
 # In-memory job storage (in production, use Redis or database)
 jobs = {}
 
-# Mock data for testing - replace with real GPT-5 analysis
-def generate_mock_analysis(restaurant_name: str, address: str) -> Dict[str, Any]:
-    """Generate mock analysis data for testing"""
-    return {
-        "restaurant_name": restaurant_name,
-        "address": address,
-        "analysis": {
-            "happy_hour_confirmed": True,
-            "happy_hour_times": "Monday-Friday 3:00 PM - 6:00 PM",
-            "happy_hour_deals": [
-                "$5 draft beers",
-                "$8 wine selections", 
-                "$12 appetizer specials"
+# GPT-5 Analysis Function
+async def analyze_restaurant_with_gpt5(restaurant_name: str, address: str, phone: Optional[str] = None) -> Dict[str, Any]:
+    """Analyze restaurant happy hour using GPT-5"""
+    try:
+        # Initialize OpenAI client
+        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+        # Construct comprehensive prompt
+        prompt = f"""
+        Find comprehensive happy hour information for this restaurant:
+        
+        Restaurant: {restaurant_name}
+        Address: {address}
+        {f"Phone: {phone}" if phone else ""}
+        
+        Search for and provide:
+        1. Happy hour schedule (specific days and times)
+        2. Drink specials and prices
+        3. Food specials and prices
+        4. Any restrictions or special conditions
+        5. Location information (bar area, patio, etc.)
+        
+        Return as structured JSON with:
+        - status: "active" | "inactive" | "unknown"
+        - schedule: object with days as keys, times as arrays
+        - offers: array of offer objects with type and description
+        - areas: array of areas where happy hour is available
+        - fine_print: array of restrictions or notes
+        - confidence_score: 0-1 rating
+        - evidence_count: number of sources found
+        - source_diversity: description of source types
+        
+        If no happy hour found, return status: "inactive" with explanation.
+        """
+        
+        # Call GPT-5
+        response = await client.chat.completions.create(
+            model="gpt-5",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a restaurant information specialist. Search for and extract happy hour information. Return valid JSON with structured data."
+                },
+                {"role": "user", "content": prompt}
             ],
-            "confidence_score": 0.85,
-            "verification_method": "website_analysis",
-            "last_updated": datetime.now().isoformat(),
-            "sources": [
-                "restaurant_website",
-                "google_business_listing"
-            ]
-        },
-        "contact_verification": {
-            "phone_verified": True,
-            "website_active": True,
-            "social_media_active": True
+            response_format={"type": "json_object"},
+            max_completion_tokens=2000
+        )
+        
+        # Parse GPT-5 response
+        gpt5_result = json.loads(response.choices[0].message.content)
+        
+        # Structure the response for our system
+        return {
+            "restaurant_name": restaurant_name,
+            "address": address,
+            "happy_hour_data": gpt5_result,
+            "confidence_score": gpt5_result.get("confidence_score", 0.5),
+            "evidence_count": gpt5_result.get("evidence_count", "Unknown"),
+            "source_diversity": gpt5_result.get("source_diversity", "Unknown"),
+            "gpt5_analysis": True,
+            "model_used": "gpt-5",
+            "tokens_used": response.usage.total_tokens,
+            "analysis_time": datetime.now().isoformat()
         }
-    }
+        
+    except Exception as e:
+        logger.error(f"GPT-5 analysis failed for {restaurant_name}: {str(e)}")
+        # Return fallback data if GPT-5 fails
+        return {
+            "restaurant_name": restaurant_name,
+            "address": address,
+            "happy_hour_data": {
+                "status": "unknown",
+                "error": f"Analysis failed: {str(e)}",
+                "schedule": {},
+                "offers": [],
+                "areas": [],
+                "fine_print": ["Analysis temporarily unavailable"]
+            },
+            "confidence_score": 0.0,
+            "evidence_count": 0,
+            "source_diversity": "None",
+            "gpt5_analysis": False,
+            "model_used": "fallback",
+            "tokens_used": 0,
+            "analysis_time": datetime.now().isoformat()
+        }
 
 async def process_analysis_job(job_id: str, request: AnalysisRequest):
-    """Process restaurant analysis job"""
+    """Process restaurant analysis job using GPT-5"""
     try:
         # Update job status
         jobs[job_id]["status"] = "running"
-        jobs[job_id]["message"] = "Analyzing restaurant data..."
+        jobs[job_id]["message"] = "Analyzing restaurant with GPT-5..."
         
-        # Simulate processing time
-        await asyncio.sleep(5)
+        logger.info(f"Starting GPT-5 analysis for job {job_id}: {request.restaurant_name}")
         
-        # Generate analysis (replace with real GPT-5 processing)
-        analysis_result = generate_mock_analysis(
+        # Call GPT-5 for real analysis
+        analysis_result = await analyze_restaurant_with_gpt5(
             request.restaurant_name, 
-            request.address
+            request.address,
+            request.phone
         )
         
         # Complete job
         jobs[job_id]["status"] = "completed"
         jobs[job_id]["result"] = analysis_result
         jobs[job_id]["completed_at"] = datetime.now().isoformat()
-        jobs[job_id]["message"] = "Analysis completed successfully"
+        jobs[job_id]["message"] = "GPT-5 analysis completed successfully"
         
-        logger.info(f"Job {job_id} completed successfully")
+        logger.info(f"Job {job_id} completed successfully - GPT-5 tokens: {analysis_result.get('tokens_used', 'unknown')}")
         
     except Exception as e:
         logger.error(f"Job {job_id} failed: {str(e)}")
         jobs[job_id]["status"] = "failed"
-        jobs[job_id]["message"] = f"Analysis failed: {str(e)}"
+        jobs[job_id]["message"] = f"GPT-5 analysis failed: {str(e)}"
 
 @app.get("/health")
 async def health_check():
