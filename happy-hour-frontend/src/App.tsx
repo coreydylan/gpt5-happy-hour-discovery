@@ -26,7 +26,7 @@ interface HappyHourAnalysis {
   timestamp: string;
 }
 
-// API Functions - Use working HTTPS subdomain
+// API Functions - Use production backend
 const API_BASE_URL = 'https://hhmap.atlascivica.com';
 
 const searchRestaurants = async (query: string): Promise<Restaurant[]> => {
@@ -139,7 +139,9 @@ const analyzeRestaurant = async (restaurant: Restaurant): Promise<HappyHourAnaly
     console.log('Job completed:', finalData);
     
     // Step 3: Format the completed job data for the frontend
-    const happyHourData = finalData.happy_hour_data || {};
+    // The data is nested in result.happy_hour_data
+    const resultData = finalData.result || {};
+    const happyHourData = resultData.happy_hour_data || {};
     
     // Create analysis text from the structured data
     let analysisText = `# ${restaurant.name} Happy Hour Analysis\n\n`;
@@ -192,18 +194,18 @@ const analyzeRestaurant = async (restaurant: Restaurant): Promise<HappyHourAnaly
     }
     
     analysisText += `## 🎯 Analysis Details\n`;
-    analysisText += `• **Confidence Score**: ${finalData.confidence_score || 'N/A'}\n`;
-    analysisText += `• **Evidence Sources**: ${finalData.evidence_count || 'N/A'}\n`;
-    analysisText += `• **Source Diversity**: ${finalData.source_diversity || 'N/A'}\n`;
+    analysisText += `• **Confidence Score**: ${resultData.confidence_score || 'N/A'}\n`;
+    analysisText += `• **Evidence Sources**: ${resultData.evidence_count || 'N/A'}\n`;
+    analysisText += `• **Source Diversity**: ${resultData.source_diversity || 'N/A'}\n`;
     analysisText += `• **Analysis Time**: ${finalData.completed_at ? new Date(finalData.completed_at).toLocaleTimeString() : 'N/A'}\n`;
     
     return {
       restaurant_name: restaurant.name,
       gpt5_analysis: analysisText,
-      model_used: 'gpt-5',
+      model_used: resultData.model_used || 'gpt-5',
       api_type: 'structured_analysis',
-      tokens_used: 0,
-      reasoning_tokens: 0,
+      tokens_used: resultData.tokens_used || 0,
+      reasoning_tokens: resultData.reasoning_tokens || 0,
       reasoning_effort: 'comprehensive',
       timestamp: finalData.completed_at || new Date().toISOString()
     };
