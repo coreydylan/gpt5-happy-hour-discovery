@@ -26,7 +26,7 @@ interface HappyHourAnalysis {
   timestamp: string;
 }
 
-// API Functions - Use Custom Domain with HTTPS
+// API Functions - Use working HTTPS subdomain
 const API_BASE_URL = 'https://hhmap.atlascivica.com';
 
 const searchRestaurants = async (query: string): Promise<Restaurant[]> => {
@@ -443,7 +443,7 @@ const HappyHourApp: React.FC = () => {
         <p>Powered by GPT-5 Responses API • {new Date().getFullYear()}</p>
         <div className="api-status">
           <div className="status-dot"></div>
-          Backend: hhmap.atlascivica.com
+          Backend: hhmap.atlascivica.com (HTTPS)
         </div>
       </footer>
     </div>

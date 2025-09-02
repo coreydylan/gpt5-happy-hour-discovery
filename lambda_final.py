@@ -227,6 +227,10 @@ def handle_job_status(job_id, headers):
     """Handle job status endpoint with real timestamp tracking"""
     
     try:
+        # Generate job hash for consistent venue_id generation
+        import hashlib
+        job_hash = int(hashlib.md5(job_id.encode()).hexdigest()[:8], 16)
+        
         # Extract timestamp from job_id (format: timestamp-uuid)
         if '-' in job_id and job_id.split('-')[0].isdigit():
             timestamp_str = job_id.split('-')[0]
@@ -235,14 +239,14 @@ def handle_job_status(job_id, headers):
             elapsed_seconds = (datetime.utcnow() - created_time).total_seconds()
         else:
             # Fallback for old format job IDs - use hash-based timing
-            import hashlib
-            job_hash = int(hashlib.md5(job_id.encode()).hexdigest()[:8], 16)
             job_age_seconds = (job_hash % 60)
             elapsed_seconds = job_age_seconds
             created_time = datetime.utcnow() - timedelta(seconds=elapsed_seconds)
         
     except Exception:
         # Final fallback for invalid job IDs
+        import hashlib
+        job_hash = int(hashlib.md5(job_id.encode()).hexdigest()[:8], 16)
         elapsed_seconds = 60  # Assume completed
         created_time = datetime.utcnow() - timedelta(seconds=60)
     

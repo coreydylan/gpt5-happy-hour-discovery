@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="GPT-5 Happy Hour Orchestrator", version="1.0.0")
 
+# Create a sub-application for the /hhmap path
+hhmap_app = FastAPI(title="GPT-5 Happy Hour Orchestrator", version="1.0.0")
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,

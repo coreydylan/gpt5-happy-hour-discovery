@@ -9,8 +9,7 @@
       },
       "CodeConfiguration": {
         "ConfigurationSource": "REPOSITORY"
-      },
-      "SourceDirectory": "/orchestrator"
+      }
     },
     "AutoDeploymentsEnabled": true,
     "AuthenticationConfiguration": {
