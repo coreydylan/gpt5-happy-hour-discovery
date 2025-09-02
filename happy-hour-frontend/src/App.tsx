@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { QueryClient, QueryClientProvider, useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { Search, MapPin, Clock, DollarSign, Coffee, Star, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Search, MapPin, Coffee, Star, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import './App.css';
 
 const queryClient = new QueryClient();
