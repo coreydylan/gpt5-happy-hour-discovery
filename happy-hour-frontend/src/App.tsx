@@ -82,7 +82,9 @@ const searchRestaurants = async (query: string): Promise<Restaurant[]> => {
 const analyzeRestaurant = async (restaurant: Restaurant): Promise<HappyHourAnalysis> => {
   try {
     console.log('Making request to:', `${API_BASE_URL}/api/analyze`);
-    const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+    
+    // Step 1: Create analysis job
+    const createResponse = await fetch(`${API_BASE_URL}/api/analyze`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -95,26 +97,115 @@ const analyzeRestaurant = async (restaurant: Restaurant): Promise<HappyHourAnaly
       }),
     });
     
-    console.log('Response status:', response.status);
-    console.log('Response ok:', response.ok);
+    console.log('Create job response status:', createResponse.status);
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (!createResponse.ok) {
+      throw new Error(`HTTP error! status: ${createResponse.status}`);
     }
     
-    const data = await response.json();
-    console.log('Response data:', data);
+    const createData = await createResponse.json();
+    console.log('Job created:', createData);
     
-    // Ensure we return the correct format
+    const jobId = createData.job_id;
+    if (!jobId) {
+      throw new Error('No job_id returned from analysis request');
+    }
+    
+    // Step 2: Poll job status until completion
+    console.log('Polling job status for:', jobId);
+    
+    const pollJobStatus = async (): Promise<any> => {
+      const statusResponse = await fetch(`${API_BASE_URL}/api/job/${jobId}`);
+      
+      if (!statusResponse.ok) {
+        throw new Error(`Job status error! status: ${statusResponse.status}`);
+      }
+      
+      const statusData = await statusResponse.json();
+      console.log('Job status:', statusData.status, statusData.message);
+      
+      if (statusData.status === 'completed') {
+        return statusData;
+      } else if (statusData.status === 'failed') {
+        throw new Error(statusData.message || 'Job failed');
+      } else {
+        // Still queued or running, wait and poll again
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        return pollJobStatus();
+      }
+    };
+    
+    const finalData = await pollJobStatus();
+    console.log('Job completed:', finalData);
+    
+    // Step 3: Format the completed job data for the frontend
+    const happyHourData = finalData.happy_hour_data || {};
+    
+    // Create analysis text from the structured data
+    let analysisText = `# ${restaurant.name} Happy Hour Analysis\n\n`;
+    
+    if (happyHourData.status === 'active') {
+      analysisText += `✅ **Happy Hour Status**: Active\n\n`;
+      
+      if (happyHourData.schedule) {
+        analysisText += `## 📅 Happy Hour Schedule\n`;
+        Object.entries(happyHourData.schedule).forEach(([day, times]: [string, any]) => {
+          const dayCapitalized = day.charAt(0).toUpperCase() + day.slice(1);
+          if (Array.isArray(times)) {
+            times.forEach(time => {
+              analysisText += `• **${dayCapitalized}**: ${time.start} - ${time.end}\n`;
+            });
+          }
+        });
+        analysisText += `\n`;
+      }
+      
+      if (happyHourData.offers && Array.isArray(happyHourData.offers)) {
+        analysisText += `## 🍻 Happy Hour Offers\n`;
+        happyHourData.offers.forEach((offer: any) => {
+          const emoji = offer.type === 'drink' ? '🍹' : '🍽️';
+          analysisText += `${emoji} **${offer.description}**\n`;
+          if (offer.days && Array.isArray(offer.days)) {
+            analysisText += `   Available: ${offer.days.join(', ')}\n`;
+          }
+        });
+        analysisText += `\n`;
+      }
+      
+      if (happyHourData.areas && Array.isArray(happyHourData.areas)) {
+        analysisText += `## 📍 Available Areas\n`;
+        happyHourData.areas.forEach((area: string) => {
+          analysisText += `• ${area.charAt(0).toUpperCase() + area.slice(1)}\n`;
+        });
+        analysisText += `\n`;
+      }
+      
+      if (happyHourData.fine_print && Array.isArray(happyHourData.fine_print)) {
+        analysisText += `## ⚠️ Important Notes\n`;
+        happyHourData.fine_print.forEach((note: string) => {
+          analysisText += `• ${note}\n`;
+        });
+        analysisText += `\n`;
+      }
+    } else {
+      analysisText += `❌ **Happy Hour Status**: Not available or inactive\n\n`;
+    }
+    
+    analysisText += `## 🎯 Analysis Details\n`;
+    analysisText += `• **Confidence Score**: ${finalData.confidence_score || 'N/A'}\n`;
+    analysisText += `• **Evidence Sources**: ${finalData.evidence_count || 'N/A'}\n`;
+    analysisText += `• **Source Diversity**: ${finalData.source_diversity || 'N/A'}\n`;
+    analysisText += `• **Analysis Time**: ${finalData.completed_at ? new Date(finalData.completed_at).toLocaleTimeString() : 'N/A'}\n`;
+    
     return {
-      restaurant_name: data.restaurant_name,
-      gpt5_analysis: data.gpt5_analysis || data.analysis || 'Analysis completed',
-      model_used: data.model_used || 'gpt-4o',
-      api_type: data.api_type || 'chat_completions',
-      tokens_used: data.tokens_used || 0,
-      reasoning_tokens: data.reasoning_tokens || 0,
-      reasoning_effort: data.reasoning_effort || 'standard',
-      timestamp: data.timestamp || new Date().toISOString()
+      restaurant_name: restaurant.name,
+      gpt5_analysis: analysisText,
+      model_used: 'gpt-5',
+      api_type: 'structured_analysis',
+      tokens_used: 0,
+      reasoning_tokens: 0,
+      reasoning_effort: 'comprehensive',
+      timestamp: finalData.completed_at || new Date().toISOString()
     };
   } catch (error) {
     console.error('Analysis failed:', error);
