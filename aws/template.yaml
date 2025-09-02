@@ -1,0 +1,436 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'GPT-5 Happy Hour Discovery System - MVP+ Agent Fleet'
+
+# ============================================================================
+# GLOBAL CONFIGURATION
+# ============================================================================
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 300  # 5 minutes max per agent
+    MemorySize: 1024  # Enough for web scraping + AI processing
+    Environment:
+      Variables:
+        # Database
+        SUPABASE_URL: !Ref SupabaseUrl
+        SUPABASE_KEY: !Ref SupabaseKey
+        
+        # AI Services  
+        OPENAI_API_KEY: !Ref OpenAIApiKey
+        ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+        
+        # External APIs
+        GOOGLE_PLACES_API_KEY: !Ref GooglePlacesApiKey
+        YELP_API_KEY: !Ref YelpApiKey
+        TWILIO_ACCOUNT_SID: !Ref TwilioAccountSid
+        TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
+        
+        # AWS Resources
+        TASK_QUEUE_URL: !Ref TaskQueue
+        RESULTS_BUCKET: !Ref ResultsBucket
+        
+        # Configuration
+        LOG_LEVEL: INFO
+        ENVIRONMENT: !Ref Environment
+
+# ============================================================================
+# PARAMETERS
+# ============================================================================
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    
+  SupabaseUrl:
+    Type: String
+    Description: Supabase project URL
+    
+  SupabaseKey:
+    Type: String
+    Description: Supabase service role key
+    NoEcho: true
+    
+  OpenAIApiKey:
+    Type: String
+    Description: OpenAI API key for GPT-4o/GPT-5
+    NoEcho: true
+    
+  AnthropicApiKey:
+    Type: String
+    Description: Anthropic API key for Claude
+    NoEcho: true
+    
+  GooglePlacesApiKey:
+    Type: String
+    Description: Google Places API key
+    NoEcho: true
+    
+  YelpApiKey:
+    Type: String
+    Description: Yelp Fusion API key
+    NoEcho: true
+    
+  TwilioAccountSid:
+    Type: String
+    Description: Twilio Account SID for voice calls
+    NoEcho: true
+    
+  TwilioAuthToken:
+    Type: String
+    Description: Twilio Auth Token
+    NoEcho: true
+
+# ============================================================================
+# INFRASTRUCTURE RESOURCES
+# ============================================================================
+
+Resources:
+  # SQS Queue for job distribution
+  TaskQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'happy-hour-tasks-${Environment}'
+      VisibilityTimeoutSeconds: 900  # 15 minutes
+      MessageRetentionPeriod: 1209600  # 14 days
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+        
+  # Dead letter queue for failed tasks
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'happy-hour-dlq-${Environment}'
+      MessageRetentionPeriod: 1209600  # 14 days
+      
+  # S3 bucket for storing raw data (HTML, PDFs, images)
+  ResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'happy-hour-results-${Environment}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldObjects
+            Status: Enabled
+            ExpirationInDays: 30  # Keep raw data for 30 days
+            
+  # IAM Role for all Lambda functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: HappyHourAgentPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: 
+                  - !GetAtt TaskQueue.Arn
+                  - !GetAtt DeadLetterQueue.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub '${ResultsBucket}/*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+# ============================================================================
+# AGENT LAMBDA FUNCTIONS
+# ============================================================================
+
+  # Orchestrator: Manages job distribution and result aggregation
+  OrchestratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'happy-hour-orchestrator-${Environment}'
+      CodeUri: ../agents/orchestrator/
+      Handler: handler.lambda_handler
+      Description: 'Orchestrates restaurant analysis jobs across agent fleet'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        TaskQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt TaskQueue.Arn
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+      Environment:
+        Variables:
+          SITE_AGENT_FUNCTION: !Ref SiteAgentFunction
+          GOOGLE_AGENT_FUNCTION: !Ref GoogleAgentFunction
+          YELP_AGENT_FUNCTION: !Ref YelpAgentFunction
+          VOICE_VERIFY_FUNCTION: !Ref VoiceVerifyFunction
+
+  # Site Agent: Website scraping and PDF processing
+  SiteAgentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'happy-hour-site-agent-${Environment}'
+      CodeUri: ../agents/site_agent/
+      Handler: handler.lambda_handler
+      Description: 'Scrapes restaurant websites for happy hour information'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 180  # 3 minutes for web scraping
+      MemorySize: 2048  # More memory for HTML processing
+      Layers:
+        - !Ref PythonDependenciesLayer
+        - !Ref PlaywrightLayer
+
+  # Google Agent: Google Business Profile and Places API
+  GoogleAgentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'happy-hour-google-agent-${Environment}'
+      CodeUri: ../agents/google_agent/
+      Handler: handler.lambda_handler
+      Description: 'Extracts happy hour data from Google Business profiles'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 120  # 2 minutes
+      Layers:
+        - !Ref PythonDependenciesLayer
+
+  # Yelp Agent: Yelp Fusion API and review analysis
+  YelpAgentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'happy-hour-yelp-agent-${Environment}'
+      CodeUri: ../agents/yelp_agent/
+      Handler: handler.lambda_handler
+      Description: 'Analyzes Yelp reviews and business data for happy hour info'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 90  # 1.5 minutes
+      Layers:
+        - !Ref PythonDependenciesLayer
+
+  # Voice Verify Agent: Phone call verification (THE KILLER FEATURE)
+  VoiceVerifyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'happy-hour-voice-verify-${Environment}'
+      CodeUri: ../agents/voice_verify/
+      Handler: handler.lambda_handler
+      Description: 'Makes phone calls to verify happy hour information directly'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 600  # 10 minutes for phone calls
+      MemorySize: 512  # Less memory needed for voice processing
+      Layers:
+        - !Ref PythonDependenciesLayer
+
+  # Consensus Engine: Mathematical confidence scoring
+  ConsensusEngineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'happy-hour-consensus-${Environment}'
+      CodeUri: ../agents/consensus/
+      Handler: handler.lambda_handler
+      Description: 'Calculates mathematical consensus and confidence scores'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60  # 1 minute for calculations
+      MemorySize: 1024
+      Layers:
+        - !Ref PythonDependenciesLayer
+
+# ============================================================================
+# SHARED LAMBDA LAYERS
+# ============================================================================
+
+  # Python dependencies layer (shared across all functions)
+  PythonDependenciesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub 'happy-hour-python-deps-${Environment}'
+      Description: 'Shared Python dependencies for agent functions'
+      ContentUri: ../layers/python_deps/
+      CompatibleRuntimes:
+        - python3.11
+      RetentionPolicy: Retain
+
+  # Playwright layer for browser automation
+  PlaywrightLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub 'happy-hour-playwright-${Environment}'
+      Description: 'Playwright browser automation for web scraping'
+      ContentUri: ../layers/playwright/
+      CompatibleRuntimes:
+        - python3.11
+      RetentionPolicy: Retain
+
+# ============================================================================
+# API GATEWAY (Optional - for direct agent testing)
+# ============================================================================
+
+  # API Gateway for direct function invocation during development
+  AgentApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub 'happy-hour-agent-api-${Environment}'
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      Auth:
+        ApiKeyRequired: true
+
+  # API Key for secure access
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: !Sub 'happy-hour-api-key-${Environment}'
+      Description: 'API key for Happy Hour agent testing'
+      Enabled: true
+
+  # Usage plan
+  UsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      UsagePlanName: !Sub 'happy-hour-usage-plan-${Environment}'
+      Description: 'Usage plan for Happy Hour API'
+      ApiStages:
+        - ApiId: !Ref AgentApi
+          Stage: !Ref Environment
+      Throttle:
+        RateLimit: 100
+        BurstLimit: 200
+      Quota:
+        Limit: 10000
+        Period: MONTH
+
+  # Link API key to usage plan
+  UsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref ApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref UsagePlan
+
+# ============================================================================
+# CLOUDWATCH ALARMS & MONITORING
+# ============================================================================
+
+  # Lambda error rate alarm
+  LambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'happy-hour-lambda-errors-${Environment}'
+      AlarmDescription: 'High error rate in Lambda functions'
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  # SQS queue depth alarm
+  QueueDepthAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'happy-hour-queue-depth-${Environment}'
+      AlarmDescription: 'Too many messages in task queue'
+      MetricName: ApproximateNumberOfVisibleMessages
+      Namespace: AWS/SQS
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt TaskQueue.QueueName
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 100
+      ComparisonOperator: GreaterThanThreshold
+
+# ============================================================================
+# OUTPUTS
+# ============================================================================
+
+Outputs:
+  TaskQueueUrl:
+    Description: 'SQS Queue URL for job distribution'
+    Value: !Ref TaskQueue
+    Export:
+      Name: !Sub '${AWS::StackName}-TaskQueue'
+
+  ResultsBucketName:
+    Description: 'S3 bucket for storing raw data'
+    Value: !Ref ResultsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-ResultsBucket'
+
+  ApiGatewayUrl:
+    Description: 'API Gateway endpoint URL'
+    Value: !Sub 'https://${AgentApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiUrl'
+
+  ApiKeyId:
+    Description: 'API Key for secure access'
+    Value: !Ref ApiKey
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiKey'
+
+  OrchestratorFunctionArn:
+    Description: 'Orchestrator Lambda function ARN'
+    Value: !GetAtt OrchestratorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-Orchestrator'
+
+  SiteAgentFunctionArn:
+    Description: 'Site Agent Lambda function ARN'
+    Value: !GetAtt SiteAgentFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-SiteAgent'
+
+  GoogleAgentFunctionArn:
+    Description: 'Google Agent Lambda function ARN'
+    Value: !GetAtt GoogleAgentFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-GoogleAgent'
+
+  YelpAgentFunctionArn:
+    Description: 'Yelp Agent Lambda function ARN'
+    Value: !GetAtt YelpAgentFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-YelpAgent'
+
+  VoiceVerifyFunctionArn:
+    Description: 'Voice Verify Lambda function ARN'
+    Value: !GetAtt VoiceVerifyFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-VoiceVerify'
+
+  ConsensusEngineFunctionArn:
+    Description: 'Consensus Engine Lambda function ARN'
+    Value: !GetAtt ConsensusEngineFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ConsensusEngine'

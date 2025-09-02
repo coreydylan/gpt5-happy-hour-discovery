@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-lg shadow-xl border border-white/20;
+  }
+  
+  .confidence-ring {
+    @apply rounded-full flex items-center justify-center font-bold text-lg;
+  }
+  
+  .confidence-high {
+    @apply bg-gradient-to-br from-green-400 to-green-600 text-white;
+  }
+  
+  .confidence-medium {
+    @apply bg-gradient-to-br from-yellow-400 to-yellow-600 text-white;
+  }
+  
+  .confidence-low {
+    @apply bg-gradient-to-br from-red-400 to-red-600 text-white;
+  }
+  
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary-500 to-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-primary-600 hover:to-primary-700 transition-all duration-200 shadow-lg hover:shadow-xl;
+  }
+  
+  .btn-secondary {
+    @apply bg-white text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all duration-200 shadow-md hover:shadow-lg border border-gray-200;
+  }
+}

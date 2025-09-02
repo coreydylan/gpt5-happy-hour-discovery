@@ -1,0 +1,64 @@
+# SAM Configuration for GPT-5 Happy Hour Discovery System
+# This file simplifies deployment commands and provides environment-specific settings
+
+version = 0.1
+
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "happy-hour-discovery-dev"
+s3_bucket = "happy-hour-discovery-deployments-us-east-1"
+s3_prefix = "deployments"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+fail_on_empty_changeset = false
+image_repositories = []
+
+[default.build]
+[default.build.parameters]
+cached = true
+parallel = true
+use_container = true  # Ensures consistent builds
+
+[default.validate]
+[default.validate.parameters]
+lint = true
+
+[default.package]
+[default.package.parameters]
+s3_bucket = "happy-hour-discovery-deployments-us-east-1"
+s3_prefix = "packages"
+
+[default.sync]
+[default.sync.parameters]
+watch = true
+
+[default.local_start_api]
+[default.local_start_api.parameters]
+warm_containers = "EAGER"
+
+[default.local_start_lambda]
+[default.local_start_lambda.parameters]
+warm_containers = "EAGER"
+
+# Development environment
+[dev]
+[dev.deploy]
+[dev.deploy.parameters]
+stack_name = "happy-hour-discovery-dev"
+parameter_overrides = "Environment=dev"
+
+# Staging environment  
+[staging]
+[staging.deploy]
+[staging.deploy.parameters]
+stack_name = "happy-hour-discovery-staging"
+parameter_overrides = "Environment=staging"
+
+# Production environment
+[prod]  
+[prod.deploy]
+[prod.deploy.parameters]
+stack_name = "happy-hour-discovery-prod"
+parameter_overrides = "Environment=prod"

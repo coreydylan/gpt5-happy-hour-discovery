@@ -2,18 +2,24 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/index.py",
+      "src": "api/main.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.py"
+      "dest": "/api/main.py"
     },
     {
-      "src": "/(.*)",
-      "dest": "/api/index.py"
+      "src": "/",
+      "dest": "/api/main.py"
     }
-  ]
+  ],
+  "env": {
+    "OPENAI_API_KEY": "@openai-api-key",
+    "SUPABASE_URL": "@supabase-url", 
+    "SUPABASE_SERVICE_KEY": "@supabase-service-key",
+    "GOOGLE_PLACES_API_KEY": "@google-places-api-key"
+  }
 }
