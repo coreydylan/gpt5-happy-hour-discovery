@@ -373,7 +373,7 @@ const HappyHourApp: React.FC = () => {
           <Coffee size={32} />
           GPT-5 Happy Hour Discovery
         </h1>
-        <p>Discover happy hour specials in La Jolla using advanced AI analysis</p>
+        <p>Discover happy hour specials in La Jolla using advanced AI analysis • Live HTTPS Backend</p>
       </header>
 
       <div className="search-section">
