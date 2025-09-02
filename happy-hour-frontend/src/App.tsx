@@ -26,8 +26,8 @@ interface HappyHourAnalysis {
   timestamp: string;
 }
 
-// API Functions - Use Application Load Balancer
-const API_BASE_URL = 'http://happy-hour-alb-711828885.us-east-1.elb.amazonaws.com';
+// API Functions - Use Custom Domain with HTTPS
+const API_BASE_URL = 'https://hhmap.atlascivica.com';
 
 const searchRestaurants = async (query: string): Promise<Restaurant[]> => {
   try {
@@ -443,7 +443,7 @@ const HappyHourApp: React.FC = () => {
         <p>Powered by GPT-5 Responses API • {new Date().getFullYear()}</p>
         <div className="api-status">
           <div className="status-dot"></div>
-          Backend: localhost:8000
+          Backend: hhmap.atlascivica.com
         </div>
       </footer>
     </div>
