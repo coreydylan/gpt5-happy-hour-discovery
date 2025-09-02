@@ -92,7 +92,7 @@ async def analyze_restaurant_with_gpt5(restaurant_name: str, address: str, phone
         If no happy hour found, return status: "inactive" with explanation.
         """
         
-        # Call GPT-5
+        # Call GPT-5 with appropriate token limits
         response = await client.chat.completions.create(
             model="gpt-5",
             messages=[
@@ -103,11 +103,15 @@ async def analyze_restaurant_with_gpt5(restaurant_name: str, address: str, phone
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            max_completion_tokens=2000
+            max_completion_tokens=4000  # Increased to account for reasoning tokens
         )
         
         # Parse GPT-5 response
-        gpt5_result = json.loads(response.choices[0].message.content)
+        content = response.choices[0].message.content
+        if not content or content.strip() == "":
+            raise ValueError(f"GPT-5 returned empty content. Finish reason: {response.choices[0].finish_reason}")
+        
+        gpt5_result = json.loads(content)
         
         # Structure the response for our system
         return {
