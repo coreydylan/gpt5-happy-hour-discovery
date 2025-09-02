@@ -16,6 +16,7 @@ import json
 import boto3
 from boto3.dynamodb.conditions import Attr
 from openai import AsyncOpenAI
+from search_tools import execute_tool_call
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -57,64 +58,76 @@ class JobStatus(BaseModel):
 # In-memory job storage (in production, use Redis or database)
 jobs = {}
 
-# GPT-5 Analysis Function
+# GPT-5 Analysis Function with Web Search
 async def analyze_restaurant_with_gpt5(restaurant_name: str, address: str, phone: Optional[str] = None) -> Dict[str, Any]:
-    """Analyze restaurant happy hour using GPT-5"""
+    """Analyze restaurant happy hour using GPT-5 with web search"""
     try:
         # Initialize OpenAI client
         client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
-        # Construct comprehensive prompt
+        # Construct prompt for web search
         prompt = f"""
-        Based on your knowledge, provide happy hour information for this restaurant. Use any information you have about this specific restaurant or similar establishments in the area.
+        Find current happy hour information for this restaurant by searching the web.
         
         Restaurant: {restaurant_name}
         Address: {address}
         {f"Phone: {phone}" if phone else ""}
         
-        Provide your best assessment of:
-        1. Happy hour schedule (typical days and times based on restaurant type and location)
-        2. Common drink specials and typical pricing for this type of venue
-        3. Common food specials and typical pricing
-        4. Typical restrictions or special conditions
-        5. Areas where happy hour is typically offered (bar, patio, etc.)
+        Search for:
+        1. The restaurant's official website for happy hour details
+        2. Recent reviews on Yelp, Google, and other review sites mentioning happy hour
+        3. Social media posts about their happy hour
+        4. Local dining guides or blogs with happy hour information
         
-        If you have specific knowledge about this restaurant, use it. Otherwise, provide educated estimates based on:
-        - Restaurant name and type (e.g., "Duke's" suggests Hawaiian/seafood, often has "Aloha Hour")
-        - Location (La Jolla is upscale, affects pricing and offerings)
-        - Common practices for similar restaurants
+        Return the findings as a JSON object with this structure:
+        {{
+            "status": "active" or "inactive" or "unknown",
+            "schedule": {{
+                "monday": [{{"start": "15:00", "end": "18:00"}}],
+                "tuesday": [{{"start": "15:00", "end": "18:00"}}],
+                "wednesday": [{{"start": "15:00", "end": "18:00"}}],
+                "thursday": [{{"start": "15:00", "end": "18:00"}}],
+                "friday": [{{"start": "15:00", "end": "18:00"}}],
+                "saturday": [],
+                "sunday": []
+            }},
+            "offers": [
+                {{"type": "drink", "description": "Well drinks", "price": "$5"}},
+                {{"type": "drink", "description": "Draft beers", "price": "$4"}},
+                {{"type": "food", "description": "Bar bites", "price": "Half off"}}
+            ],
+            "areas": ["bar", "patio"],
+            "fine_print": ["Must be 21+", "Dine-in only", "Information should be verified with restaurant"],
+            "confidence_score": 0.75,
+            "evidence_count": 3,
+            "source_diversity": "Found on official website, confirmed in 2 recent Yelp reviews"
+        }}
         
-        Return as structured JSON with:
-        - status: "active" | "inactive" | "unknown" (assume "active" for restaurants unless you know otherwise)
-        - schedule: object with days as keys, times as arrays (use common patterns like 3-6pm or 4-7pm)
-        - offers: array of offer objects with type and description (be specific with typical offerings)
-        - areas: array of areas where happy hour is available
-        - fine_print: array of restrictions or notes (include "Call to confirm current offerings")
-        - confidence_score: 0-1 rating (0.3-0.5 for educated guesses, higher if you have specific knowledge)
-        - evidence_count: number based on your knowledge sources
-        - source_diversity: describe basis of information (e.g., "Based on typical upscale restaurant patterns in La Jolla")
-        
-        Always provide useful information even if estimated. Indicate uncertainty in confidence_score and fine_print.
+        Only include information you find from web sources. Set status to "unknown" if no information is found.
+        Set confidence_score based on source quality (0-1).
         """
         
-        # Call GPT-5 with appropriate token limits
+        # Call GPT-5 with web search tool enabled
         response = await client.chat.completions.create(
             model="gpt-5",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a restaurant information specialist with extensive knowledge of dining establishments. Provide helpful happy hour information based on your knowledge, including educated estimates when specific details are unknown. Always return valid JSON with structured data. Be helpful and provide value even when working with limited information."
+                    "content": "You are a restaurant information specialist with web search capabilities. Search the web and provide only real, verified information about restaurant happy hours."
                 },
                 {"role": "user", "content": prompt}
             ],
+            tools=[{"type": "web_search_preview"}],  # Enable web search
             response_format={"type": "json_object"},
-            max_completion_tokens=4000  # Increased to account for reasoning tokens
+            max_completion_tokens=4000,
+            temperature=0.3  # Lower temperature for more consistent structured output
         )
         
-        # Parse GPT-5 response
+        # Get the response content
         content = response.choices[0].message.content
+        
         if not content or content.strip() == "":
-            raise ValueError(f"GPT-5 returned empty content. Finish reason: {response.choices[0].finish_reason}")
+            raise ValueError(f"GPT-5 returned empty content")
         
         gpt5_result = json.loads(content)
         
