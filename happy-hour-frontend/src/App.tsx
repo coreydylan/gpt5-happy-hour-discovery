@@ -26,8 +26,8 @@ interface HappyHourAnalysis {
   timestamp: string;
 }
 
-// API Functions - Use environment variable or fallback to local
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// API Functions - Use App Runner service URL
+const API_BASE_URL = 'https://23pqq3ixts.us-east-1.awsapprunner.com';
 
 const searchRestaurants = async (query: string): Promise<Restaurant[]> => {
   try {
