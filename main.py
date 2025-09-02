@@ -184,24 +184,31 @@ async def search_restaurants(query: str = "", limit: int = 20):
     
     try:
         if query:
-            # Search using scan with filter (for simplicity - in production, use better indexing)
+            # For case-insensitive search, scan all and filter in Python
+            # (For large datasets, consider using DynamoDB Global Secondary Indexes)
             query_lower = query.lower()
             response = restaurants_table.scan(
-                FilterExpression=(
-                    Attr('name').contains(query_lower) |
-                    Attr('address').contains(query_lower) |
-                    Attr('city').contains(query_lower)
-                ) & Attr('active').eq(True),
-                Limit=limit
+                FilterExpression=Attr('active').eq(True)
             )
+            
+            # Filter results case-insensitively in Python
+            all_restaurants = response.get('Items', [])
+            filtered_restaurants = [
+                r for r in all_restaurants
+                if (query_lower in r.get('name', '').lower() or 
+                    query_lower in r.get('address', '').lower() or
+                    query_lower in r.get('city', '').lower())
+            ]
+            
+            # Apply limit
+            restaurants = filtered_restaurants[:limit]
         else:
             # Get all active restaurants
             response = restaurants_table.scan(
                 FilterExpression=Attr('active').eq(True),
                 Limit=limit
             )
-        
-        restaurants = response.get('Items', [])
+            restaurants = response.get('Items', [])
         
         # Convert Decimal to float for JSON serialization
         def convert_decimals(obj):
