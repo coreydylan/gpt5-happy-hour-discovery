@@ -27,7 +27,7 @@ interface HappyHourAnalysis {
 }
 
 // API Functions - Use App Runner service URL
-const API_BASE_URL = 'https://23pqq3ixts.us-east-1.awsapprunner.com';
+const API_BASE_URL = 'https://pjqhqbtwn4.us-east-1.awsapprunner.com';
 
 const searchRestaurants = async (query: string): Promise<Restaurant[]> => {
   try {
