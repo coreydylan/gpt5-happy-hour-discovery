@@ -152,18 +152,89 @@ async def get_job_status(job_id: str):
     return JobStatus(**job)
 
 @app.get("/api/restaurants/search")
-async def search_restaurants(q: str = ""):
-    """Search restaurants endpoint for compatibility"""
-    # Mock restaurant search results
-    mock_results = [
+async def search_restaurants(query: str = "", limit: int = 20):
+    """Search La Jolla restaurants"""
+    # La Jolla restaurant database
+    restaurants_db = [
         {
-            "name": f"Restaurant matching '{q}'",
-            "address": "123 Main St, City, ST 12345",
-            "phone": "(555) 123-4567",
-            "business_type": "restaurant"
+            "id": "1",
+            "name": "DUKES RESTAURANT",
+            "address": "1216 PROSPECT ST, LA JOLLA, CA 92037",
+            "phone": "858-454-5888",
+            "business_type": "Restaurant Food Facility",
+            "city": "LA JOLLA"
+        },
+        {
+            "id": "2", 
+            "name": "BARBARELLA RESTAURANT",
+            "address": "2171 AVENIDA DE LA PLAYA, LA JOLLA, CA 92037",
+            "phone": "858-242-2589",
+            "business_type": "Restaurant Food Facility",
+            "city": "LA JOLLA"
+        },
+        {
+            "id": "3",
+            "name": "EDDIE VS #8511", 
+            "address": "1270 PROSPECT ST, LA JOLLA, CA 92037",
+            "phone": "858-459-5500",
+            "business_type": "Restaurant Food Facility",
+            "city": "LA JOLLA"
+        },
+        {
+            "id": "4",
+            "name": "THE PRADO RESTAURANT",
+            "address": "1549 EL PRADO, LA JOLLA, CA 92037", 
+            "phone": "858-454-1549",
+            "business_type": "Restaurant Food Facility",
+            "city": "LA JOLLA"
+        },
+        {
+            "id": "5",
+            "name": "GEORGE'S AT THE COVE",
+            "address": "1250 PROSPECT ST, LA JOLLA, CA 92037", 
+            "phone": "858-454-4244",
+            "business_type": "Restaurant Food Facility",
+            "city": "LA JOLLA"
+        },
+        {
+            "id": "6",
+            "name": "THE MARINE ROOM",
+            "address": "2000 SPINDRIFT DR, LA JOLLA, CA 92037", 
+            "phone": "858-459-7222",
+            "business_type": "Restaurant Food Facility",
+            "city": "LA JOLLA"
+        },
+        {
+            "id": "7",
+            "name": "HERRINGBONE LA JOLLA",
+            "address": "7837 HERSCHEL AVE, LA JOLLA, CA 92037", 
+            "phone": "858-459-0221",
+            "business_type": "Restaurant Food Facility",
+            "city": "LA JOLLA"
+        },
+        {
+            "id": "8",
+            "name": "PUESTO LA JOLLA",
+            "address": "1026 WALL ST, LA JOLLA, CA 92037", 
+            "phone": "858-454-1026",
+            "business_type": "Restaurant Food Facility",
+            "city": "LA JOLLA"
         }
     ]
-    return {"restaurants": mock_results}
+    
+    # Filter restaurants based on query
+    if query:
+        filtered_restaurants = [
+            r for r in restaurants_db 
+            if query.lower() in r["name"].lower() or query.lower() in r["address"].lower()
+        ]
+    else:
+        filtered_restaurants = restaurants_db
+    
+    # Apply limit
+    limited_restaurants = filtered_restaurants[:limit]
+    
+    return {"restaurants": limited_restaurants}
 
 @app.get("/api/jobs")
 async def list_jobs():
