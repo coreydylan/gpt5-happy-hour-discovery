@@ -1,0 +1,117 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpt5-happy-hour-discovery"
+version = "2.1.0"
+description = "GPT-5 powered happy hour discovery system with voice verification"
+readme = "README.md"
+authors = [
+    {name = "GPT-5 Happy Hour Team"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.11"
+
+[tool.black]
+line-length = 127
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | lambda_deploy
+  | lambda_full_deploy
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 127
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_glob = ["**/lambda_deploy/**", "**/lambda_full_deploy/**"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "lambda_deploy", "lambda_full_deploy"]
+skips = ["B101", "B601"]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "lambda_deploy/*",
+    "lambda_full_deploy/*",
+    "venv/*",
+    "env/*",
+    "setup.py",
+    "*/migrations/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "pass",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = [
+    "--verbose",
+    "--tb=short",
+    "--strict-markers",
+    "--strict-config",
+    "--color=yes",
+    "--durations=10",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Tests that take a long time",
+    "aws: Tests that require AWS credentials",
+    "database: Tests that require database connection",
+]

@@ -1,0 +1,29 @@
+# Testing dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.1
+pytest-asyncio>=0.21.1
+pytest-env>=0.8.2
+
+# Mocking and fixtures
+responses>=0.23.3
+moto[all]>=4.2.5
+freezegun>=1.2.2
+
+# HTTP testing
+httpx>=0.24.1
+requests-mock>=1.11.0
+
+# Database testing
+pytest-postgresql>=5.0.0
+factory-boy>=3.3.0
+
+# Code quality
+black>=23.7.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.5.1
+bandit>=1.7.5
+
+# Coverage reporting
+coverage>=7.3.0

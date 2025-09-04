@@ -1,0 +1,6 @@
+# Minimal requirements for Lambda - pure Python packages only
+openai>=1.51.0
+httpx
+boto3
+python-dotenv
+typing-extensions

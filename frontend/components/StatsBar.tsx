@@ -8,8 +8,12 @@ import { motion } from 'framer-motion'
 interface Stats {
   total_venues: number
   total_jobs: number
-  happy_hours_found: number
-  gpt5_enabled: boolean
+  completed_jobs: number
+  queued_jobs: number
+  running_jobs: number
+  failed_jobs: number
+  system_status: string
+  gpt_version: string
 }
 
 export default function StatsBar() {
@@ -45,15 +49,15 @@ export default function StatsBar() {
     },
     {
       icon: CheckCircle,
-      label: 'Happy Hours Found',
-      value: stats.happy_hours_found.toLocaleString(),
+      label: 'Completed Jobs',
+      value: stats.completed_jobs.toLocaleString(),
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
     },
     {
       icon: Sparkles,
       label: 'AI Model',
-      value: 'GPT-5',
+      value: stats.gpt_version || 'GPT-5',
       color: 'text-primary-600',
       bgColor: 'bg-primary-100',
     },

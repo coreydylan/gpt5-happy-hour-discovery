@@ -88,5 +88,29 @@ node_modules/
 happy-hour-frontend/build/
 happy-hour-frontend/node_modules/
 
+# AWS Lambda build artifacts
+*.zip
+lambda_deploy/
+lambda_full_deploy/
+lambda_working/
+lambda_simple/
+*_deploy/
+*_build/
+sam-app/
+.aws-sam/
+
+# SAM deployment artifacts
+template.yaml.backup
+packaged-template.yaml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# CloudFormation
+cloudformation-template-update-stack.json
+
 # Vercel
 .vercel

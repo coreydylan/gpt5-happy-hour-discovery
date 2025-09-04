@@ -2,9 +2,14 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
+  "functions": {
+    "app/**/*.js": {
+      "maxDuration": 10
+    }
+  },
   "env": {
-    "NEXT_PUBLIC_API_URL": "@happy_hour_api_url",
-    "NEXT_PUBLIC_SUPABASE_URL": "@supabase_url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key"
+    "NEXT_PUBLIC_API_URL": "https://uu4pbfcm5rop2dropvwdm3iofe0mbfsi.lambda-url.us-west-2.on.aws",
+    "NEXT_PUBLIC_SUPABASE_URL": "https://vnnplotrwbtjtopknxgl.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZubnBsb3Ryd2J0anRvcGtueGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3ODQ3NTgsImV4cCI6MjA3MjM2MDc1OH0.6tFjILZCBtEDXyB4NXGfR1QjwsM1Gg0I0PAXF5jSgEQ"
   }
 }

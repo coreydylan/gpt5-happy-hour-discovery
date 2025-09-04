@@ -16,7 +16,11 @@ import {
   DollarSign,
   AlertCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ExternalLink,
+  Brain,
+  Shield,
+  RefreshCw
 } from 'lucide-react'
 
 interface ResultsDisplayProps {
@@ -28,8 +32,20 @@ interface JobStatus {
   status: 'pending' | 'in_progress' | 'completed' | 'failed'
   venue_id?: string
   confidence_score?: number
-  happy_hour_found?: boolean
-  consensus_data?: any
+  happy_hour_data?: {
+    status: 'active' | 'inactive'
+    schedule: any
+    offers: any[]
+    areas: any[]
+    fine_print: string[]
+  }
+  reasoning?: string
+  sources?: Array<{
+    url: string
+    title: string
+    type: string
+  }>
+  evidence_quality?: 'high' | 'medium' | 'low' | 'none'
   total_cost_cents?: number
   agents_completed?: string[]
   error_message?: string
@@ -37,14 +53,43 @@ interface JobStatus {
 
 export default function ResultsDisplay({ jobId }: ResultsDisplayProps) {
   const [expanded, setExpanded] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string>('')
   
-  const { data: jobStatus, isLoading, error } = useQuery<JobStatus>(
+  const { data: jobStatus, isLoading, error, refetch } = useQuery<JobStatus>(
     ['job', jobId],
     async () => {
-      const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/job/${jobId}`
-      )
-      return response.data
+      try {
+        // Try the provided job ID first
+        setDebugInfo(`Trying job ID: ${jobId}`)
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/job/${jobId}`
+        )
+        setDebugInfo(`✅ Found job: ${jobId} - Status: ${response.data.status}`)
+        return response.data
+      } catch (error: any) {
+        // If job ID has old format suffix, try without it
+        if (jobId.endsWith('-uuid') && error.response?.status === 404) {
+          const cleanJobId = jobId.replace('-uuid', '')
+          setDebugInfo(`🔄 Trying clean ID: ${cleanJobId}`)
+          const fallbackResponse = await axios.get(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/job/${cleanJobId}`
+          )
+          setDebugInfo(`✅ Found job: ${cleanJobId} - Status: ${fallbackResponse.data.status}`)
+          return fallbackResponse.data
+        }
+        // If short ID, try with suffix for legacy jobs
+        if (jobId.length <= 8 && error.response?.status === 404) {
+          const legacyJobId = `${jobId}-uuid`
+          setDebugInfo(`🔄 Trying legacy ID: ${legacyJobId}`)
+          const legacyResponse = await axios.get(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/job/${legacyJobId}`
+          )
+          setDebugInfo(`✅ Found job: ${legacyJobId} - Status: ${legacyResponse.data.status}`)
+          return legacyResponse.data
+        }
+        setDebugInfo(`❌ Job not found: ${jobId}`)
+        throw error
+      }
     },
     {
       refetchInterval: (data) => {
@@ -54,6 +99,13 @@ export default function ResultsDisplay({ jobId }: ResultsDisplayProps) {
         }
         return false
       },
+      retry: (failureCount, error: any) => {
+        // Don't retry if it's a 404 after our fallback attempts
+        if (error?.response?.status === 404 && failureCount >= 1) {
+          return false
+        }
+        return failureCount < 3
+      }
     }
   )
 
@@ -122,7 +174,22 @@ export default function ResultsDisplay({ jobId }: ResultsDisplayProps) {
               <p className="text-sm text-gray-600">
                 Job ID: {jobId.slice(0, 8)}...
               </p>
+              {debugInfo && (
+                <p className="text-xs text-blue-600 mt-1">
+                  {debugInfo}
+                </p>
+              )}
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => refetch()}
+              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Refresh job status"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
 
           {jobStatus.confidence_score !== undefined && (
@@ -134,20 +201,81 @@ export default function ResultsDisplay({ jobId }: ResultsDisplayProps) {
       </div>
 
       {/* Main Results */}
-      {jobStatus.status === 'completed' && jobStatus.consensus_data && (
+      {jobStatus.status === 'completed' && jobStatus.happy_hour_data && (
         <div className="p-6 space-y-6">
-          {/* Happy Hour Found */}
+          {/* Happy Hour Status */}
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <span className="font-medium text-gray-700">Happy Hour Found:</span>
+            <span className="font-medium text-gray-700">Happy Hour Status:</span>
             <span className={`font-bold text-lg ${
-              jobStatus.happy_hour_found ? 'text-green-600' : 'text-gray-400'
+              jobStatus.happy_hour_data.status === 'active' ? 'text-green-600' : 'text-gray-400'
             }`}>
-              {jobStatus.happy_hour_found ? 'YES' : 'NO'}
+              {jobStatus.happy_hour_data.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
             </span>
           </div>
 
+          {/* GPT-5 Reasoning */}
+          {jobStatus.reasoning && (
+            <div className="space-y-3">
+              <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Brain className="w-5 h-5 text-purple-500" />
+                GPT-5 Analysis Reasoning
+              </h4>
+              <div className="bg-purple-50 rounded-lg p-4">
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {jobStatus.reasoning}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Sources */}
+          {jobStatus.sources && jobStatus.sources.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                <ExternalLink className="w-5 h-5 text-blue-500" />
+                Sources & Evidence
+              </h4>
+              <div className="space-y-2">
+                {jobStatus.sources.map((source, index) => (
+                  <div key={index} className="bg-blue-50 rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-blue-900">{source.title}</p>
+                      <p className="text-xs text-blue-600 uppercase">{source.type}</p>
+                    </div>
+                    <a 
+                      href={source.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:text-blue-700"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Evidence Quality */}
+          {jobStatus.evidence_quality && (
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-gray-500" />
+                <span className="font-medium text-gray-700">Evidence Quality:</span>
+              </div>
+              <span className={`font-bold text-sm uppercase px-3 py-1 rounded-full ${
+                jobStatus.evidence_quality === 'high' ? 'bg-green-100 text-green-700' :
+                jobStatus.evidence_quality === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                jobStatus.evidence_quality === 'low' ? 'bg-orange-100 text-orange-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>
+                {jobStatus.evidence_quality}
+              </span>
+            </div>
+          )}
+
           {/* Schedule */}
-          {jobStatus.consensus_data.schedule && (
+          {jobStatus.happy_hour_data.schedule && Object.keys(jobStatus.happy_hour_data.schedule).length > 0 && (
             <div className="space-y-3">
               <h4 className="font-semibold text-gray-900 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary-500" />
@@ -155,23 +283,43 @@ export default function ResultsDisplay({ jobId }: ResultsDisplayProps) {
               </h4>
               <div className="bg-blue-50 rounded-lg p-4">
                 <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                  {JSON.stringify(jobStatus.consensus_data.schedule, null, 2)}
+                  {JSON.stringify(jobStatus.happy_hour_data.schedule, null, 2)}
                 </pre>
               </div>
             </div>
           )}
 
-          {/* Specials */}
-          {jobStatus.consensus_data.specials && (
+          {/* Offers */}
+          {jobStatus.happy_hour_data.offers && jobStatus.happy_hour_data.offers.length > 0 && (
             <div className="space-y-3">
               <h4 className="font-semibold text-gray-900 flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-primary-500" />
-                Specials
+                Happy Hour Offers
               </h4>
               <div className="bg-green-50 rounded-lg p-4">
                 <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                  {JSON.stringify(jobStatus.consensus_data.specials, null, 2)}
+                  {JSON.stringify(jobStatus.happy_hour_data.offers, null, 2)}
                 </pre>
+              </div>
+            </div>
+          )}
+
+          {/* Fine Print */}
+          {jobStatus.happy_hour_data.fine_print && jobStatus.happy_hour_data.fine_print.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-orange-500" />
+                Important Notes
+              </h4>
+              <div className="bg-orange-50 rounded-lg p-4">
+                <ul className="text-sm text-gray-700 space-y-1">
+                  {jobStatus.happy_hour_data.fine_print.map((note, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="text-orange-500 mt-1">•</span>
+                      <span>{note}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           )}
@@ -217,7 +365,7 @@ export default function ResultsDisplay({ jobId }: ResultsDisplayProps) {
               >
                 <div className="bg-gray-50 rounded-lg p-4">
                   <pre className="text-xs text-gray-600 overflow-auto">
-                    {JSON.stringify(jobStatus.consensus_data, null, 2)}
+                    {JSON.stringify(jobStatus.happy_hour_data, null, 2)}
                   </pre>
                 </div>
               </motion.div>

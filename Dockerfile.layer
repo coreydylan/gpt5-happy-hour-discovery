@@ -1,0 +1,11 @@
+
+FROM public.ecr.aws/lambda/python:3.11-x86_64
+
+RUN pip install --target /opt/python openai==1.99.1 supabase==2.9.1
+
+# Clean up any unnecessary files
+RUN find /opt/python -name "*.pyc" -delete
+RUN find /opt/python -name "__pycache__" -exec rm -rf {} + || true
+RUN find /opt/python -name "*.so" -exec strip {} + || true
+
+CMD ["echo", "Layer built successfully"]

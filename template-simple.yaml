@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'GPT-5 Happy Hour Discovery - Orchestrator Function'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+  SupabaseUrl:
+    Type: String
+    Default: "https://example.supabase.co"
+  SupabaseServiceKey:
+    Type: String
+    Default: "test-key"
+    NoEcho: true
+  OpenAIApiKey:
+    Type: String
+    Default: "test-key"
+    NoEcho: true
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 300
+    MemorySize: 1024
+
+Resources:
+  # Main orchestrator function
+  OrchestratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'gpt5-happy-hour-orchestrator-${Environment}'
+      Handler: lambda_orchestrator.lambda_handler
+      CodeUri: .
+      Layers:
+        - !Ref PythonDependenciesLayer
+      Description: 'GPT-5 Happy Hour Discovery Orchestrator'
+      Environment:
+        Variables:
+          SUPABASE_URL: !Ref SupabaseUrl
+          SUPABASE_SERVICE_KEY: !Ref SupabaseServiceKey
+          OPENAI_API_KEY: !Ref OpenAIApiKey
+          ENVIRONMENT: !Ref Environment
+      FunctionUrlConfig:
+        AuthType: NONE
+
+  # Python dependencies layer
+  PythonDependenciesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub 'happy-hour-python-deps-${Environment}'
+      Description: 'Shared Python dependencies'
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - python3.11
+      RetentionPolicy: Delete
+
+Outputs:
+  FunctionUrl:
+    Description: 'Lambda Function URL'
+    Value: !GetAtt OrchestratorFunctionUrl.FunctionUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionUrl'
+  
+  FunctionArn:
+    Description: 'Function ARN'
+    Value: !GetAtt OrchestratorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionArn'
