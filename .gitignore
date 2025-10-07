@@ -90,3 +90,8 @@ happy-hour-frontend/node_modules/
 
 # Vercel
 .vercel
+
+# Legacy archive (keep readme tracked, ignore contents)
+archive/legacy/**
+!archive/legacy/
+!archive/legacy/README.md
