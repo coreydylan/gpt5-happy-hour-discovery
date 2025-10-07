@@ -4,6 +4,7 @@ This repository has been reset around the AgentKit + ChatKit stack. All legacy L
 
 ## Active Workspace
 - `agentkit/` – canonical JSON schema, prompts, Supabase tables, and the `happy_hour_agents.yaml` workflow.
+- `agentkit/connectors/` – concrete implementations for workflow tool IDs (see `docs/connectors.md` for setup and smoke tests).
 - `chatkit-frontend/` – Next.js console embedding the ChatKit web component and session bridge.
 - `AGENTKIT_PROGRESS.md` – historical summary & current status.
 - `HHMAP_ROADMAP.md` – forward-looking plan of record.
