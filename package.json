@@ -1,5 +1,23 @@
 {
+  "name": "hhmap",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "orchestrator": "tsx agentkit/orchestrator/cli.ts",
+    "build": "tsc --noEmit",
+    "test": "vitest",
+    "test:orchestrator": "vitest run --reporter=verbose"
+  },
   "dependencies": {
-    "supabase": "^2.39.2"
+    "@supabase/supabase-js": "^2.48.0",
+    "pino": "^9.4.0",
+    "yaml": "^2.6.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^1.6.1"
   }
 }
