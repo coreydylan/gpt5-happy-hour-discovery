@@ -114,3 +114,8 @@ cloudformation-template-update-stack.json
 
 # Vercel
 .vercel
+
+# Legacy archive (keep readme tracked, ignore contents)
+archive/legacy/**
+!archive/legacy/
+!archive/legacy/README.md
