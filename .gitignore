@@ -82,6 +82,7 @@ Thumbs.db
 !package.json
 !package-lock.json
 !vercel.json
+!tsconfig.json
 
 # Node modules (for frontend)
 node_modules/
