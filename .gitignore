@@ -11,6 +11,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+!chatkit-frontend/src/lib/
+!chatkit-frontend/src/lib/**
 lib64/
 parts/
 sdist/

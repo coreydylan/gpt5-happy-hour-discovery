@@ -70,6 +70,29 @@ Seeds or refreshes a happy hour contract using the template in `agentkit/contrac
 ### `GET /api/contracts/[slug]`
 Returns the persisted contract for a restaurant. Falls back to the template when Supabase is unavailable.
 
+### `POST /api/contracts/merge`
+Deterministically merges an agent patch into the canonical contract. The service loads the current contract (or template), compares field confidence and recency, and records conflicts under `contract.overrides`.
+
+```bash
+curl -X POST http://localhost:3000/api/contracts/merge \
+  -H "Content-Type: application/json" \
+  -d '{
+    "restaurant_slug": "verification-bistro",
+    "patch": {
+      "restaurant": {
+        "name": {
+          "value": "Verification Bistro",
+          "sources": ["https://example.com"],
+          "last_checked": "2025-01-01T00:00:00Z",
+          "confidence": 0.9
+        }
+      }
+    }
+  }'
+```
+
+The response includes the merged contract plus diagnostics summarizing accepted fields and any conflicts flagged for review.
+
 ### `POST /api/chatkit/session`
 Creates a ChatKit session via the OpenAI API and returns the short-lived `client_secret` used by the widget.
 

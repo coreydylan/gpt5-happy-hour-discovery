@@ -7,7 +7,7 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test \"scripts/**/*.test.ts\"",
+    "test": "tsx --test \"scripts/**/*.test.ts\" \"src/**/*.test.ts\"",
     "verify:supabase": "tsx scripts/verifySupabaseState.ts"
   },
   "dependencies": {
